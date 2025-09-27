@@ -79,12 +79,14 @@ clone_repositories() {
     print_info "\n📦 Cloning repositories..."
     
     local repos=(
-        "https://github.com/sonisoft-cnanda/sn-sdk-mock.git:sn-sdk-mock"
-        "https://github.com/sonisoft-cnanda/servicenow-glide.git:servicenow-glide"
+        "sn-sdk-mock:https://github.com/sonisoft-cnanda/sn-sdk-mock.git"
+        "servicenow-glide:https://github.com/sonisoft-cnanda/servicenow-glide.git"
     )
     
     for repo_info in "${repos[@]}"; do
-        IFS=':' read -r url folder <<< "$repo_info"
+        # Split on the first colon only (folder:url format)
+        local folder="${repo_info%%:*}"
+        local url="${repo_info#*:}"
         
         if [ -d "$folder" ]; then
             print_warning "Repository $folder already exists, skipping..."
