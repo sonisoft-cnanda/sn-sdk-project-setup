@@ -63,8 +63,8 @@ clone_repositories() {
     print_info "\nCloning repositories..."
     
     local repos=(
-        "https://github.com/sonisoft-cnanda/sn-sdk-mock.git:sn-sdk-mock.git"
-        "https://github.com/sonisoft-cnanda/servicenow-glide.git:servicenow-glide.git"
+        "https://github.com/sonisoft-cnanda/sn-sdk-mock.git"
+        "https://github.com/sonisoft-cnanda/servicenow-glide.git"
     )
     
     for repo_info in "${repos[@]}"; do
