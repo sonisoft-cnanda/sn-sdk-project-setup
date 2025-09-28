@@ -147,41 +147,97 @@ function Create-Project {
     }
 }
 
-# Function to create package.json
-function Create-PackageJson {
-    $packageJsonPath = Join-Path $ProjectName "package.json"
+
+# Function to verify and install npm
+function Verify-Npm {
+    Write-Host "`nVerifying npm installation..." -ForegroundColor Yellow
     
-    if (!(Test-Path $packageJsonPath)) {
-        Write-Host "Creating package.json..." -ForegroundColor Cyan
-        
-        $packageJson = @{
-            name = $ProjectName
-            version = "1.0.0"
-            description = "ServiceNow Development Project"
-            main = "src/index.js"
-            scripts = @{
-                test = "jest"
-                "test:watch" = "jest --watch"
-                "build" = "tsc"
-                "dev" = "ts-node src/index.ts"
+    # Store current directory
+    $originalDir = Get-Location
+    
+    # Change to project directory to use the correct Node.js version
+    try {
+        Push-Location $ProjectName
+        Write-Host "Changed to project directory: $(Get-Location)" -ForegroundColor Cyan
+    } catch {
+        Write-Host "Failed to change to project directory: $ProjectName" -ForegroundColor Red
+        return $false
+    }
+    
+    try {
+        # Set the Node.js version for this directory
+        if (Test-Command "nodenv") {
+            Write-Host "Setting Node.js version 22.16.0 for project..." -ForegroundColor Cyan
+            
+            # Check if Node.js version exists
+            $nodeVersions = nodenv versions 2>$null
+            if ($nodeVersions -notcontains "22.16.0") {
+                Write-Host "Installing Node.js version 22.16.0..." -ForegroundColor Cyan
+                nodenv install 22.16.0
             }
-            devDependencies = @{
-                "@servicenow/glide" = "git://github.com/sonisoft-cnanda/servicenow-glide"
-                "sn-sdk-mock" = "file:../sn-sdk-mock"
-                "@types/jest" = "^29.5.0"
-                "@types/node" = "^20.0.0"
-                "jest" = "^29.5.0"
-                "ts-node" = "^10.9.0"
-                "typescript" = "^5.0.0"
-            }
-            jest = @{
-                testEnvironment = "node"
-                testMatch = @("**/test/**/*.test.js", "**/test/**/*.test.ts")
+            
+            # Set local version
+            nodenv local 22.16.0
+            
+            # Verify Node.js version
+            try {
+                $currentNodeVersion = node --version 2>$null
+                if ($currentNodeVersion) {
+                    Write-Host "Node.js version set to: $currentNodeVersion" -ForegroundColor Green
+                } else {
+                    Write-Host "Failed to set Node.js version" -ForegroundColor Red
+                    return $false
+                }
+            } catch {
+                Write-Host "Failed to verify Node.js version" -ForegroundColor Red
+                return $false
             }
         }
         
-        $packageJson | ConvertTo-Json -Depth 10 | Out-File -FilePath $packageJsonPath -Encoding UTF8
-        Write-Host "Created package.json" -ForegroundColor Green
+        # Check if npm is available
+        if (Test-Command "npm") {
+            $npmVersion = npm --version
+            Write-Host "npm is available (version: $npmVersion)" -ForegroundColor Green
+        } else {
+            Write-Host "npm is not available, installing..." -ForegroundColor Yellow
+            
+            # Install npm using the current Node.js installation
+            if (Test-Command "node") {
+                Write-Host "Installing npm using Node.js..." -ForegroundColor Cyan
+                # Use the Node.js installation to install npm
+                try {
+                    if (Test-Command "bash") {
+                        # Use bash if available (Git Bash, WSL, etc.)
+                        Invoke-WebRequest -Uri "https://npmjs.org/install.sh" -OutFile "install-npm.sh"
+                        bash install-npm.sh
+                    } else {
+                        # For Windows, try alternative approach
+                        Write-Host "Installing npm via Node.js corepack..." -ForegroundColor Cyan
+                        node -e "require('child_process').exec('corepack enable npm')" 2>$null
+                    }
+                    
+                    if (Test-Command "npm") {
+                        $npmVersion = npm --version
+                        Write-Host "npm installed successfully (version: $npmVersion)" -ForegroundColor Green
+                    } else {
+                        Write-Host "Failed to install npm" -ForegroundColor Red
+                        return $false
+                    }
+                } catch {
+                    Write-Host "Error installing npm: $($_.Exception.Message)" -ForegroundColor Red
+                    return $false
+                }
+            } else {
+                Write-Host "Node.js is not available, cannot install npm" -ForegroundColor Red
+                return $false
+            }
+        }
+        
+        return $true
+    } finally {
+        # Return to original directory
+        Pop-Location
+        Write-Host "Returned to original directory: $(Get-Location)" -ForegroundColor Cyan
     }
 }
 
@@ -233,8 +289,10 @@ try {
     
     # Create project structure
     Create-Project
-    Create-PackageJson
     Create-TsConfig
+    
+    # Verify npm installation
+    $npmVerified = Verify-Npm
     
     Write-Host "`n" + "="*60 -ForegroundColor Green
     Write-Host "Setup completed successfully!" -ForegroundColor Green
@@ -248,13 +306,12 @@ try {
     } else {
         Write-Host "2. Install and configure nodenv, then run: nodenv install 22.16.0" -ForegroundColor Cyan
     }
-    Write-Host "4. Install dependencies: npm install" -ForegroundColor Cyan
+    Write-Host "4. Use ServiceNow SDK to initialize the project" -ForegroundColor Cyan
     Write-Host "5. Start developing!" -ForegroundColor Cyan
     
     Write-Host "`nProject structure created:" -ForegroundColor Yellow
     Write-Host "- $ProjectName/" -ForegroundColor White
     Write-Host "  ├── .node-version (22.16.0)" -ForegroundColor White
-    Write-Host "  ├── package.json" -ForegroundColor White
     Write-Host "  ├── tsconfig.json" -ForegroundColor White
     Write-Host "  ├── src/" -ForegroundColor White
     Write-Host "  └── test/" -ForegroundColor White

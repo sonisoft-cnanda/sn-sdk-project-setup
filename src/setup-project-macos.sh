@@ -259,53 +259,79 @@ create_project() {
     print_success "Created test directory"
 }
 
-# Function to create package.json
-create_package_json() {
-    local package_json_path="$PROJECT_NAME/package.json"
+
+# Function to verify and install npm
+verify_npm() {
+    print_info "\n🔍 Verifying npm installation..."
     
-    if [ ! -f "$package_json_path" ]; then
-        print_info "Creating package.json..."
-        
-        cat > "$package_json_path" << EOF
-{
-  "name": "$PROJECT_NAME",
-  "version": "1.0.0",
-  "description": "ServiceNow Development Project",
-  "main": "src/index.js",
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "build": "tsc",
-    "build:watch": "tsc --watch",
-    "dev": "ts-node src/index.ts",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
-  },
-  "devDependencies": {
-    "@servicenow/glide": "git://github.com/sonisoft-cnanda/servicenow-glide",
-    "sn-sdk-mock": "file:../sn-sdk-mock",
-    "@types/jest": "^29.5.0",
-    "@types/node": "^20.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0",
-    "@typescript-eslint/parser": "^6.0.0",
-    "eslint": "^8.0.0",
-    "jest": "^29.5.0",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": ["**/test/**/*.test.js", "**/test/**/*.test.ts"],
-    "collectCoverageFrom": [
-      "src/**/*.{js,ts}",
-      "!src/**/*.d.ts"
-    ]
-  }
-}
-EOF
-        print_success "Created package.json"
+    # Store current directory
+    local original_dir=$(pwd)
+    
+    # Change to project directory to use the correct Node.js version
+    if ! cd "$PROJECT_NAME"; then
+        print_error "Failed to change to project directory: $PROJECT_NAME"
+        return 1
     fi
+    
+    print_info "Changed to project directory: $(pwd)"
+    
+    # Set the Node.js version for this directory
+    if command_exists nodenv; then
+        print_info "Setting Node.js version $NODE_VERSION for project..."
+        
+        # Install the Node.js version if it doesn't exist
+        if ! nodenv versions | grep -q "$NODE_VERSION"; then
+            print_info "Installing Node.js version $NODE_VERSION..."
+            nodenv install "$NODE_VERSION"
+        fi
+        
+        # Set local version
+        nodenv local "$NODE_VERSION"
+        
+        # Refresh nodenv environment
+        eval "$(nodenv init -)"
+        
+        # Verify Node.js version
+        local current_node_version=$(node --version 2>/dev/null)
+        if [ -n "$current_node_version" ]; then
+            print_success "Node.js version set to: $current_node_version"
+        else
+            print_error "Failed to set Node.js version"
+            cd "$original_dir"
+            return 1
+        fi
+    fi
+    
+    # Check if npm is available
+    if command -v npm >/dev/null 2>&1; then
+        local npm_version=$(npm --version)
+        print_success "npm is available (version: $npm_version)"
+    else
+        print_warning "npm is not available, installing..."
+        
+        # Install npm using the current Node.js installation
+        if command_exists node; then
+            print_info "Installing npm using Node.js..."
+            # Use the Node.js installation to install npm
+            curl -L https://npmjs.org/install.sh | sh
+            if command -v npm >/dev/null 2>&1; then
+                local npm_version=$(npm --version)
+                print_success "npm installed successfully (version: $npm_version)"
+            else
+                print_error "Failed to install npm"
+                cd "$original_dir"
+                return 1
+            fi
+        else
+            print_error "Node.js is not available, cannot install npm"
+            cd "$original_dir"
+            return 1
+        fi
+    fi
+    
+    # Return to original directory
+    cd "$original_dir"
+    print_info "Returned to original directory: $(pwd)"
 }
 
 # Function to create TypeScript config
@@ -454,7 +480,7 @@ show_next_steps() {
         print_warning "2. Install and configure nodenv, then run: nodenv install $NODE_VERSION"
     fi
     
-    print_info "4. Install dependencies: npm install"
+    print_info "4. Use ServiceNow SDK to initialize the project"
     print_info "5. Start developing!"
     
     print_info "\n📁 Project structure created:"
@@ -462,7 +488,6 @@ show_next_steps() {
     echo -e "${WHITE}  ├── .node-version ($NODE_VERSION)${NC}"
     echo -e "${WHITE}  ├── .eslintrc.js${NC}"
     echo -e "${WHITE}  ├── .gitignore${NC}"
-    echo -e "${WHITE}  ├── package.json${NC}"
     echo -e "${WHITE}  ├── tsconfig.json${NC}"
     echo -e "${WHITE}  ├── src/${NC}"
     echo -e "${WHITE}  └── test/${NC}"
@@ -527,10 +552,12 @@ main() {
     
     # Create project structure
     create_project
-    create_package_json
     create_ts_config
     create_eslint_config
     create_gitignore
+    
+    # Verify npm installation
+    verify_npm
     
     # Show next steps
     show_next_steps
