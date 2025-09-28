@@ -149,6 +149,45 @@ This script will:
 - Add `sn-sdk-mock` as a local dependency
 - Install the updated dependencies
 
+## 🔧 Why Custom Dependencies?
+
+### Custom servicenow-glide Package
+
+The setup scripts replace the official `@servicenow/glide` package with a custom version from our git repository. Here's why:
+
+#### The Multi-Application Challenge
+
+When building multiple ServiceNow applications that interact with each other, the standard TypeScript approach becomes cumbersome. The official ServiceNow documentation shows how to add custom type definitions using `declare module`, but this requires duplicating the same declarations across every application.
+
+For example, if you define custom types like this:
+
+```typescript
+declare module '@servicenow/glide/sn_app_api' {
+    class AppStoreAPI {
+        static canUpgradeAnyStoreApp(): boolean
+    }
+}
+```
+
+You need to duplicate this declaration in each application to use those types, making it difficult to scale across multiple applications.
+
+#### The Solution
+
+Our custom `servicenow-glide` package provides:
+
+- **Centralized type definitions** - Define custom types once in a shared library
+- **Cross-application consistency** - Use the same types across all your ServiceNow applications
+- **Reduced maintenance** - Update types in one place instead of multiple applications
+- **Enhanced scalability** - Easily add new custom APIs and share them across projects
+
+### sn-sdk-mock Package
+
+The `sn-sdk-mock` package provides:
+
+- **Local development testing** - Mock ServiceNow APIs for offline development
+- **Unit testing support** - Test your code without a ServiceNow instance
+- **API simulation** - Simulate ServiceNow behavior for development and testing
+
 ### Step 6: Start Developing!
 
 You're now ready to develop with:
